@@ -44,3 +44,4 @@ async def auth_middleware(app: web.Application, handler):
         else:
             raise web.HTTPUnauthorized(reason="Unauthorized")
     return middleware
+
