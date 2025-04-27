@@ -37,6 +37,7 @@ async def connect() -> Optional[SerialInterface]:
     return None
 
 
+
 async def disconnect(connection: SerialInterface):
     """Disconnects from the Meshtastic network."""
     try:
@@ -44,6 +45,7 @@ async def disconnect(connection: SerialInterface):
         logger.info("Disconnected from Meshtastic")
     except Exception as e:
         logger.error(f"Error disconnecting from Meshtastic: {e}", exc_info=True)
+
 
 
 async def send_message(connection: SerialInterface, message: str, destination_node: Optional[int] = None, port: int = 200):
@@ -55,16 +57,19 @@ async def send_message(connection: SerialInterface, message: str, destination_no
         logger.error(f"Error sending message: {e}", exc_info=True)
 
 
+
 def set_message_callback(callback):
     """Sets the callback function for handling received messages."""
     global message_callback
     message_callback = callback
 
 
+
 def on_meshtastic_message(packet, interface):
     """Handles incoming Meshtastic packets."""
     if message_callback:
         asyncio.run(message_callback(packet))
+
 
 
 def get_node_id():
