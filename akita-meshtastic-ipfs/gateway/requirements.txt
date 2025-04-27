@@ -1,0 +1,5 @@
+ipfshttpclient
+pyserial
+meshtastic
+aiohttp
+socketio
