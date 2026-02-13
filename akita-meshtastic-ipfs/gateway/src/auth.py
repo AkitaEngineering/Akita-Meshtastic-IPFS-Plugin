@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 async def authenticate(request: web.Request) -> Optional[str]:
     """Authenticates the request using a pre-shared key."""
     if not config.AUTHENTICATION_ENABLED:
-        return None  # Authentication is disabled
+        # Authentication disabled — allow through
+        return request.remote
 
     auth_header = request.headers.get("Authorization")
     if not auth_header:
@@ -36,6 +37,10 @@ async def authenticate(request: web.Request) -> Optional[str]:
 async def auth_middleware(app: web.Application, handler):
     """Authentication middleware for aiohttp."""
     async def middleware(request: web.Request):
+        # If auth is disabled in config, bypass middleware immediately
+        if not config.AUTHENTICATION_ENABLED:
+            return await handler(request)
+
         authenticated_ip = await authenticate(request)
         if authenticated_ip:
             # Store authenticated IP

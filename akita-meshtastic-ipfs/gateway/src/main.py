@@ -7,6 +7,7 @@ import socketio
 from aiohttp import web, ClientSession
 import json
 import auth  # Import the authentication module
+import ipfshttpclient
 from typing import Optional
 
 logging.basicConfig(
@@ -42,49 +43,16 @@ async def main():
             # Add authentication middleware to the web application
             app.middlewares.append(auth.auth_middleware)
 
-            async def on_meshtastic_message(message):
-                """Callback for handling Meshtastic messages."""
+            # Register a task-creating wrapper that schedules the module-level handler
+            def _meshtastic_wrapper(msg):
+                # schedule handler as a task so the meshtastic thread isn't blocked
                 try:
-                    if message.decoded and message.decoded.get('portnum') == config.IPFS_PORT:
-                        cid_or_data = message.decoded.get('payload')
-                        if cid_or_data:
-                            if isinstance(cid_or_data, str) and len(cid_or_data) == config.CID_LENGTH:
-                                cid = cid_or_data
-                                logger.info(f"Received CID: {cid} from Meshtastic")
-                                data = await ipfs_comm.get_data(ipfs_node, cid, session)
-                                if data:
-                                    logger.info(f"Retrieved data from IPFS: {data[:100]}...")  # Log only the first 100 bytes
-                                    # Send data back to Meshtastic and via SocketIO
-                                    await meshtastic_comm.send_message(
-                                        meshtastic_connection,
-                                        data.decode('utf-8'),
-                                        destination_node=message.from_id,
-                                        port=config.IPFS_PORT,
-                                    )
-                                    await sio.emit('ipfs_data', {'cid': cid, 'data': data.decode('utf-8')})
-                                else:
-                                    logger.error(f"Failed to retrieve data for CID: {cid}")
-                            else:  # Assume it's data to store
-                                data_bytes = cid_or_data  # Rename
-                                data_str = data_bytes.decode('utf-8')
-                                logger.info(f"Received data from Meshtastic: {data_str[:100]}...")
-                                cid = await ipfs_comm.add_data(ipfs_node, data_bytes, session)
-                                if cid:
-                                    logger.info(f"Stored data on IPFS, CID: {cid}")
-                                    # Send CID back to Meshtastic and via SocketIO
-                                    await meshtastic_comm.send_message(
-                                        meshtastic_connection,
-                                        cid,
-                                        destination_node=message.from_id,
-                                        port=config.IPFS_PORT,
-                                    )
-                                    await sio.emit('ipfs_cid', {'original_data': data_str, 'cid': cid})
-                                else:
-                                    logger.error("Failed to store data on IPFS")
-                except Exception as e:
-                    logger.error(f"Error handling Meshtastic message: {e}", exc_info=True)
+                    asyncio.create_task(handle_meshtastic_message(ipfs_node, meshtastic_connection, sio, session, msg))
+                except RuntimeError:
+                    # If there's no running loop, try to run the handler synchronously (best-effort)
+                    asyncio.run(handle_meshtastic_message(ipfs_node, meshtastic_connection, sio, session, msg))
 
-            meshtastic_comm.set_message_callback(on_meshtastic_message)
+            meshtastic_comm.set_message_callback(_meshtastic_wrapper)
 
             async def handle_client(sid, environ):
                 """Handles new SocketIO client connections."""
@@ -114,6 +82,65 @@ async def main():
 async def health_check(request):
     """Health check endpoint."""
     return web.Response(text="OK", status=200)
+
+
+async def handle_meshtastic_message(ipfs_node, meshtastic_connection, sio_server, session, message):
+    """Module-level handler for Meshtastic messages.
+
+    This is extracted for easier testing and to allow scheduling from other threads.
+    """
+    try:
+        if getattr(message, 'decoded', None) and message.decoded.get('portnum') == config.IPFS_PORT:
+            payload_bytes = message.decoded.get('payload')
+            if not isinstance(payload_bytes, (bytes, bytearray)):
+                logger.error("Invalid payload type")
+                return
+            try:
+                payload_str = bytes(payload_bytes).decode('utf-8')
+            except UnicodeDecodeError:
+                logger.error("Failed to decode payload")
+                return
+
+            sender_id = (
+                getattr(message, 'from_id', None)
+                or getattr(message, 'from', None)
+                or getattr(message, 'fromId', None)
+                or (message.get('from') if isinstance(message, dict) else None)
+            )
+
+            if len(payload_str) == config.CID_LENGTH:
+                cid = payload_str
+                logger.info(f"Received CID: {cid} from Meshtastic")
+                data = await ipfs_comm.get_data(ipfs_node, cid, session)
+                if data:
+                    logger.info(f"Retrieved data from IPFS: {data[:100]}...")
+                    await meshtastic_comm.send_message(
+                        meshtastic_connection,
+                        data.decode('utf-8'),
+                        destination_node=sender_id,
+                        port=config.IPFS_PORT,
+                    )
+                    await sio_server.emit('ipfs_data', {'cid': cid, 'data': data.decode('utf-8')})
+                else:
+                    logger.error(f"Failed to retrieve data for CID: {cid}")
+            else:
+                data_bytes = payload_bytes
+                data_str = payload_str
+                logger.info(f"Received data from Meshtastic: {data_str[:100]}...")
+                cid = await ipfs_comm.add_data(ipfs_node, data_bytes, session)
+                if cid:
+                    logger.info(f"Stored data on IPFS, CID: {cid}")
+                    await meshtastic_comm.send_message(
+                        meshtastic_connection,
+                        cid,
+                        destination_node=sender_id,
+                        port=config.IPFS_PORT,
+                    )
+                    await sio_server.emit('ipfs_cid', {'original_data': data_str, 'cid': cid})
+                else:
+                    logger.error("Failed to store data on IPFS")
+    except Exception as e:
+        logger.error(f"Error handling Meshtastic message: {e}", exc_info=True)
 
 
 if __name__ == "__main__":

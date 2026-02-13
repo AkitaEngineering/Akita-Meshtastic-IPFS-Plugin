@@ -57,7 +57,7 @@ void handleMeshtasticMessage(const meshtastic_Packet &packet) {
         return;
     }
     if (packet.decoded.portnum == IPFS_PORT) {
-        if (packet.decoded.payload.size() > CID_LENGTH && isCID(packet.decoded.payload)) {
+        if (packet.decoded.payload.size() == CID_LENGTH) {
             String cid = String((char*)packet.decoded.payload.data(), packet.decoded.payload.size());
             Serial.print("AkitaMeshtasticIPFS: Received CID: ");
             Serial.println(cid);
