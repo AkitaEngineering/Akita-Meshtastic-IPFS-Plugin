@@ -35,11 +35,13 @@ The following options can be configured in the Meshtastic settings (using the ap
 * `enabled`: (Boolean) Enables or disables the IPFS plugin. Default: `true`.
 * `gatewayAddress`: (String) The IP address of the IPFS gateway.
 * `gatewayPort`: (Integer) The port number of the IPFS gateway.
+* `gatewayKey`: (String) The pre-shared key used for the gateway's `Authorization: PSK <key>` header. Default: `secret_key`.
 
 ##   Usage
 
 * Once the plugin is installed and configured, Meshtastic devices will communicate with the IPFS gateway to send and receive data via IPFS.
 * The ESP32 device needs to be connected to the same Wi-Fi network as the IPFS gateway.
+* The plugin talks to the gateway over HTTP `POST /api/ipfs` and expects JSON responses containing either a CID or retrieved data.
 
 ##   Important Notes
 

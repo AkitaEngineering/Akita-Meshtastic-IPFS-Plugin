@@ -95,7 +95,7 @@ def test_handle_meshtastic_message_retrieve(monkeypatch):
 
     monkeypatch.setattr(gateway_main.ipfs_comm, 'get_data', fake_get)
 
-    cid_str = 'x' * gateway_main.config.CID_LENGTH
+    cid_str = 'QmYwAPJzv5CZsnAzt8auVZRnGzr1gKizGb2YxY8jL8P5sA'
     payload = cid_str.encode('utf-8')
     msg = SimpleNamespace(decoded={'portnum': gateway_main.config.IPFS_PORT, 'payload': payload}, from_id=321)
 
@@ -107,3 +107,75 @@ def test_handle_meshtastic_message_retrieve(monkeypatch):
     assert sent_data == 'retrieved-data'
     assert dest == 321
     assert port == gateway_main.config.IPFS_PORT
+
+
+def test_process_plugin_request_store(monkeypatch):
+    sio = DummySio()
+
+    async def fake_add(node, data, session=None):
+        assert data == b'hello from plugin'
+        return 'QmPluginCID'
+
+    monkeypatch.setattr(gateway_main.ipfs_comm, 'add_data', fake_add)
+
+    body, status = asyncio.run(
+        gateway_main.process_plugin_request(
+            object(),
+            sio,
+            None,
+            {'type': 'store', 'data': 'hello from plugin', 'sender': 77},
+        )
+    )
+
+    assert status == 200
+    assert body == {'type': 'cid', 'cid': 'QmPluginCID', 'sender': 77}
+    assert sio.emits == [('ipfs_cid', {'original_data': 'hello from plugin', 'cid': 'QmPluginCID'})]
+
+
+def test_process_plugin_request_retrieve(monkeypatch):
+    sio = DummySio()
+
+    async def fake_get(node, cid, session=None):
+        assert cid == 'QmYwAPJzv5CZsnAzt8auVZRnGzr1gKizGb2YxY8jL8P5sA'
+        return b'payload from ipfs'
+
+    monkeypatch.setattr(gateway_main.ipfs_comm, 'get_data', fake_get)
+
+    body, status = asyncio.run(
+        gateway_main.process_plugin_request(
+            object(),
+            sio,
+            None,
+            {
+                'type': 'retrieve',
+                'cid': 'QmYwAPJzv5CZsnAzt8auVZRnGzr1gKizGb2YxY8jL8P5sA',
+                'sender': 12,
+            },
+        )
+    )
+
+    assert status == 200
+    assert body == {'type': 'data', 'data': 'payload from ipfs', 'sender': 12}
+    assert sio.emits == [
+        (
+            'ipfs_data',
+            {
+                'cid': 'QmYwAPJzv5CZsnAzt8auVZRnGzr1gKizGb2YxY8jL8P5sA',
+                'data': 'payload from ipfs',
+            },
+        )
+    ]
+
+
+def test_process_plugin_request_rejects_invalid_cid():
+    body, status = asyncio.run(
+        gateway_main.process_plugin_request(
+            object(),
+            DummySio(),
+            None,
+            {'type': 'retrieve', 'cid': 'not-a-real-cid', 'sender': 3},
+        )
+    )
+
+    assert status == 400
+    assert body == {'error': 'cid is invalid'}

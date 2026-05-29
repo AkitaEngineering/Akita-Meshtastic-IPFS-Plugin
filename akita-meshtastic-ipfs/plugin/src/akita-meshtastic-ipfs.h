@@ -8,28 +8,32 @@
 #include <string>
 #include "IPAddress.h"
 #include "WiFi.h"
+#include "meshtastic.h"
 
 namespace AkitaMeshtasticIPFS {
 
 const int CID_LENGTH = 46;
 const int IPFS_PORT = 200;
+const unsigned long HTTP_RESPONSE_TIMEOUT = 5000;
 
 extern bool isEnabled;
 extern IPAddress gatewayAddress;
 extern uint16_t gatewayPort;
+extern String gatewayKey;
 extern WiFiClient wifiClient;
 
 
 void setup();
 void loop();
 void handleMeshtasticMessage(const meshtastic_Packet &packet);
-void sendMessageWithIPFS(const String &message, uint32_t senderId);
-void retrieveAndDisplay(const String &cid, uint32_t senderId);
+void storeDataOnIPFS(const String &message, uint32_t senderId);
+void sendCIDToGateway(const String &cid, uint32_t senderId);
 bool isCID(const std::vector<uint8_t> &payload);
 void loadConfig();
 void saveConfig();
 void displayProgress();
 void sendDataToGateway(const String &data);
+bool readGatewayResponse(String &statusLine, String &responseBody);
 void handleGatewayResponse(const String &response);
 
 

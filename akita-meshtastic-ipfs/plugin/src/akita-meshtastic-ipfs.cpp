@@ -11,6 +11,7 @@ namespace AkitaMeshtasticIPFS {
 bool isEnabled = true;
 IPAddress gatewayAddress;
 uint16_t gatewayPort = 8080;
+String gatewayKey = "secret_key";
 unsigned long lastProgressUpdate = 0;
 const int MAX_MESSAGE_SIZE = 256;
 WiFiClient wifiClient;
@@ -44,11 +45,6 @@ void setup() {
 void loop() {
     if (!isEnabled) return;
     displayProgress();
-    // Check for data from Gateway
-    if (wifiClient.available()) {
-        String response = wifiClient.readStringUntil('\n');
-        handleGatewayResponse(response);
-    }
 }
 
 
@@ -57,7 +53,7 @@ void handleMeshtasticMessage(const meshtastic_Packet &packet) {
         return;
     }
     if (packet.decoded.portnum == IPFS_PORT) {
-        if (packet.decoded.payload.size() == CID_LENGTH) {
+        if (isCID(packet.decoded.payload)) {
             String cid = String((char*)packet.decoded.payload.data(), packet.decoded.payload.size());
             Serial.print("AkitaMeshtasticIPFS: Received CID: ");
             Serial.println(cid);
@@ -108,15 +104,80 @@ void sendCIDToGateway(const String &cid, uint32_t senderId) {
 }
 
 void sendDataToGateway(const String &data) {
-    // Send data to the gateway (IP address and port).
+    // Send data to the gateway (IP address and port) and handle the HTTP response inline.
     if (wifiClient.connect(gatewayAddress, gatewayPort)) {
-        wifiClient.println(data);
-        wifiClient.println(); // Send an extra empty line to indicate end of message
+        wifiClient.setTimeout(HTTP_RESPONSE_TIMEOUT);
+        wifiClient.print("POST /api/ipfs HTTP/1.1\r\n");
+        wifiClient.print("Host: ");
+        wifiClient.print(gatewayAddress.toString());
+        wifiClient.print(":");
+        wifiClient.print(gatewayPort);
+        wifiClient.print("\r\n");
+        wifiClient.print("Content-Type: application/json\r\n");
+        wifiClient.print("Content-Length: ");
+        wifiClient.print(data.length());
+        wifiClient.print("\r\n");
+        wifiClient.print("Connection: close\r\n");
+        if (gatewayKey.length() > 0) {
+            wifiClient.print("Authorization: PSK ");
+            wifiClient.print(gatewayKey);
+            wifiClient.print("\r\n");
+        }
+        wifiClient.print("\r\n");
+        wifiClient.print(data);
         Serial.println("AkitaMeshtasticIPFS: Sent data to gateway.");
+
+        String statusLine;
+        String responseBody;
+        if (readGatewayResponse(statusLine, responseBody)) {
+            if (!statusLine.startsWith("HTTP/1.1 200") && !statusLine.startsWith("HTTP/1.0 200")) {
+                Serial.print("AkitaMeshtasticIPFS: Gateway request failed: ");
+                Serial.println(statusLine);
+                if (responseBody.length() > 0) {
+                    Serial.println(responseBody);
+                }
+            } else if (responseBody.length() > 0) {
+                handleGatewayResponse(responseBody);
+            } else {
+                Serial.println("AkitaMeshtasticIPFS: Gateway response was empty.");
+            }
+        } else {
+            Serial.println("AkitaMeshtasticIPFS: Timed out waiting for gateway response.");
+        }
     } else {
         Serial.println("AkitaMeshtasticIPFS: Failed to connect to gateway.");
     }
     wifiClient.stop();
+}
+
+
+bool readGatewayResponse(String &statusLine, String &responseBody) {
+    unsigned long startedAt = millis();
+    while (!wifiClient.available() && wifiClient.connected()) {
+        if (millis() - startedAt > HTTP_RESPONSE_TIMEOUT) {
+            return false;
+        }
+        delay(10);
+    }
+
+    if (!wifiClient.available()) {
+        return false;
+    }
+
+    statusLine = wifiClient.readStringUntil('\n');
+    statusLine.trim();
+
+    while (wifiClient.connected()) {
+        String headerLine = wifiClient.readStringUntil('\n');
+        headerLine.trim();
+        if (headerLine.length() == 0) {
+            break;
+        }
+    }
+
+    responseBody = wifiClient.readString();
+    responseBody.trim();
+    return true;
 }
 
 
@@ -165,15 +226,34 @@ void handleGatewayResponse(const String &response) {
 }
 
 bool isCID(const std::vector<uint8_t>&payload) {
-    if (payload.size() != CID_LENGTH) {
+    if (payload.empty()) {
         return false;
     }
-    for (uint8_t byte : payload) {
-        if (!isxdigit(byte)) {
-            return false;
+
+    String candidate((const char*)payload.data(), payload.size());
+    candidate.trim();
+
+    if (candidate.startsWith("Qm") && candidate.length() == CID_LENGTH) {
+        const char* base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+        for (size_t i = 0; i < candidate.length(); ++i) {
+            if (strchr(base58Alphabet, candidate[i]) == nullptr) {
+                return false;
+            }
         }
+        return true;
     }
-    return true;
+
+    if (candidate.startsWith("b") && candidate.length() >= 10) {
+        for (size_t i = 0; i < candidate.length(); ++i) {
+            char ch = candidate[i];
+            if (!((ch >= 'a' && ch <= 'z') || (ch >= '2' && ch <= '7'))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    return false;
 }
 
 void loadConfig() {
@@ -186,6 +266,10 @@ void loadConfig() {
        gatewayAddress.fromString(addressStr);
     }
     gatewayPort = doc["gatewayPort"] | gatewayPort;
+    const char* keyStr = doc["gatewayKey"];
+    if (keyStr && strlen(keyStr) > 0) {
+        gatewayKey = keyStr;
+    }
 }
 
 void saveConfig() {
@@ -193,6 +277,7 @@ void saveConfig() {
     doc["enabled"] = isEnabled;
     doc["gatewayAddress"] = gatewayAddress.toString();
     doc["gatewayPort"] = gatewayPort;
+    doc["gatewayKey"] = gatewayKey;
     String config;
     serializeJson(doc, config);
     Meshtastic.getPrefs().set("akita-ipfs", config);

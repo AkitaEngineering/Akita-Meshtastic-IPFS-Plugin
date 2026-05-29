@@ -19,6 +19,7 @@ This Meshtastic plugin, `akita-meshtastic-ipfs`, integrates the InterPlanetary F
 * **Progress Indication:** Displays connected peers and free heap memory.
 * **Security:** Includes basic authentication with a pre-shared key.
 * **Robustness:** Implements retries and detailed error logging.
+* **HTTP Gateway Bridge:** The plugin exchanges JSON requests with the gateway over HTTP and receives CID or data responses immediately.
 
 ## Installation
 
@@ -37,6 +38,7 @@ This Meshtastic plugin, `akita-meshtastic-ipfs`, integrates the InterPlanetary F
         * Enable or disable the plugin (`enabled`).
         * Set the IPFS gateway address (`gatewayAddress`).
         * Set the IPFS gateway port (`gatewayPort`).
+        * Set the shared gateway key (`gatewayKey`) when gateway authentication is enabled.
 
 ## Gateway Installation
 
@@ -98,13 +100,14 @@ The following options can be configured in the Meshtastic settings (using the ap
 * `enabled`: (Boolean) Enables or disables the IPFS plugin. Default: `true`.
 * `gatewayAddress`: (String) The IP address of the IPFS gateway.
 * `gatewayPort`: (Integer) The port number of the IPFS gateway.
+* `gatewayKey`: (String) The pre-shared key sent as `Authorization: PSK <key>`. Default: `secret_key`.
 
 ## Usage
 
 * Once the plugin and gateway are set up, Meshtastic devices can send and receive data via IPFS.
 * When sending data, the Meshtastic device sends the data to the gateway, which stores it on IPFS and returns the CID. The CID is then broadcast over the Meshtastic network.
 * When receiving a CID, a Meshtastic device can request the data from the gateway, which retrieves it from IPFS and sends it back to the device.
-* The gateway also provides a SocketIO interface for web applications to interact with IPFS data.
+* The gateway also provides a SocketIO interface for web applications and an authenticated HTTP endpoint at `/api/ipfs` for the embedded plugin.
 
 ## Important Notes
 

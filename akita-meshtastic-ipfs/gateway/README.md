@@ -8,6 +8,7 @@ This component runs on a Linux machine (e.g., Raspberry Pi) and acts as a gatewa
 * **Meshtastic Communication:** Connects to the Meshtastic network via serial or TCP/IP.
 * **Data Bridging:** Relays data between Meshtastic and IPFS.
 * **Web Interface:** Provides a SocketIO interface for web applications to interact with IPFS data.
+* **Plugin API:** Provides an authenticated HTTP endpoint at `/api/ipfs` for plugin store/retrieve requests.
 * **Configuration:** Configurable via environment variables.
 * **Authentication:** Includes basic authentication with a pre-shared key.
 * **Error Handling:** Robust error handling and logging.
@@ -63,6 +64,17 @@ The following environment variables can be used to configure the gateway:
 * `WEB_PORT`: The port number for the SocketIO web server. Default: `8080`.
 * `AUTHENTICATION_ENABLED`: Set to `True` to enable authentication, `False` to disable. Default: `True`.
 * `PRESHARED_KEY`: The pre-shared key used for authentication. **Required if authentication is enabled.** Default: `secret_key` (CHANGE THIS!).
+
+##   Plugin HTTP Interface
+
+The embedded plugin sends authenticated HTTP `POST` requests to `/api/ipfs` on the gateway port.
+
+* **Store request:** `{"type":"store","data":"<payload>","sender":123}`
+* **Store response:** `{"type":"cid","cid":"<cid>","sender":123}`
+* **Retrieve request:** `{"type":"retrieve","cid":"<cid>","sender":123}`
+* **Retrieve response:** `{"type":"data","data":"<payload>","sender":123}`
+
+When authentication is enabled, the request must include `Authorization: PSK <pre-shared-key>`.
 
 ##   SocketIO Interface
 

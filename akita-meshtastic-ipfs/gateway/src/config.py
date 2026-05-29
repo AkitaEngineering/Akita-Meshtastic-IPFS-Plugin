@@ -2,7 +2,7 @@
 
 import os
 
-IPFS_PORT = 200  # Port number for IPFS messages
+IPFS_PORT = int(os.environ.get("IPFS_PORT", "200"))  # Port number for IPFS messages
 MESHTASTIC_DEVICE = os.environ.get("MESHTASTIC_DEVICE", "/dev/ttyUSB0")  # Serial port for Meshtastic
 USE_MESH_INTERFACE = os.environ.get("USE_MESH_INTERFACE", "True").lower() == "true"  # Use TCP/IP
 MESHTASTIC_HOST = os.environ.get("MESHTASTIC_HOST", "127.0.0.1")  # IP of device
