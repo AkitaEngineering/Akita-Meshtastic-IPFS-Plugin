@@ -1,14 +1,14 @@
-# Akita Meshtastic IPFS Plugin (Kennel Integration)
+# Akita Meshtastic IPFS Plugin
 
 **Organization:** Akita Engineering
 **Website:** [www.akitaengineering.com](www.akitaengineering.com)
 **Contact Email:** info@akitaengineering.com
 
-This Meshtastic plugin, `akita-meshtastic-ipfs`, integrates the InterPlanetary File System (IPFS) with Meshtastic, enabling decentralized data storage and retrieval over your Meshtastic network. This version is designed to be used with Meshtastic's "The Kennel" plugin framework.
+This Meshtastic plugin, `akita-meshtastic-ipfs`, integrates the InterPlanetary File System (IPFS) with Meshtastic, enabling decentralized data storage and retrieval over your Meshtastic network. It is implemented as a Meshtastic plugin to simplify integration with Meshtastic-based projects.
 
 ## Features
 
-* **Kennel Integration:** Seamless integration with Meshtastic's plugin framework for modularity and maintainability.
+* **Plugin Integration:** Designed to integrate with Meshtastic's plugin framework for modularity and maintainability.
 * **Decentralized Data Storage:** Store and retrieve messages and files using IPFS.
 * **Offline Access:** Access previously retrieved data even without an internet connection.
 * **Content Addressing:** Ensure data integrity and authenticity using IPFS CIDs.
@@ -31,7 +31,7 @@ This Meshtastic plugin, `akita-meshtastic-ipfs`, integrates the InterPlanetary F
 
 3.  **Compile and Flash:**
     * Compile and flash the Meshtastic firmware to your devices.
-    * Because the plugin is registered with The Kennel, no manual registration in `main.cpp` is required.
+    * Depending on your Meshtastic setup, you may need to register the plugin in `main.cpp` or follow your project's plugin registration process.
 
 4.  **Configuration:**
     * Use the Meshtastic app or CLI to configure the plugin:

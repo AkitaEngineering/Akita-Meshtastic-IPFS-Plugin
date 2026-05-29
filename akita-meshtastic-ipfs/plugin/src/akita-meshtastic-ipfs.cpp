@@ -1,4 +1,4 @@
-// plugin/src/akita-meshtastic-ipfs.cpp - Meshtastic IPFS Integration Plugin (Kennel)
+// plugin/src/akita-meshtastic-ipfs.cpp - Meshtastic IPFS Integration Plugin
 
 #include "akita-meshtastic-ipfs.h"
 #include "meshtastic.h"
@@ -294,7 +294,7 @@ void displayProgress() {
 
 } // namespace AkitaMeshtasticIPFS
 
-// Kennel plugin registration
+// Plugin registration
 static meshtastic_PluginStaticConfig staticConfig{
     .name = "akita-ipfs",
     .version = "1.0",
